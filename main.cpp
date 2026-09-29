@@ -71,7 +71,6 @@ int main (int argc, char* argv[])
 
     cout << "recrusive = " << recursive << endl;
     cout << "ignoreCase = " << ignoreCase << endl;
-
     cout << "searchpath: " << argv[optind] << endl;
 
 
