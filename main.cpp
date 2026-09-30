@@ -4,46 +4,72 @@
 #include <vector>
 #include <sys/wait.h>
 #include <filesystem>
+#include <cctype>
+
 
 using namespace std;
 namespace fs = filesystem;
 
 
 
-void checkEntry(const fs::directory_entry& entry, const string& filename){
+string toLower(const string& text){
+    // TODO: Alle Zeichen in Kleinbuchstaben umwandeln du kannst tolower(c) verwenden
+    
+
+}
+
+bool filenamesMatch(const string& currentName, const string& filename, bool ignoreCase){
+    // TODO: Dateinamen vergleichen
+    //wenn ignoreCase false(!ignoreCase) ist, normal vergleichen.
+    //Wenn ignoreCase true ist, Groß-/Kleinschreibung ignoeieren. 
+    
+}
+
+
+string checkEntry(const fs::directory_entry& entry, const string& filename, bool ignoreCase){
 
     if (entry.is_regular_file()){
 
-            string currenName = entry.path().filename().string();
-            if(currenName == filename){
-                cout << entry.path() << endl;
-            }
-        }
+        string currentName = entry.path().filename().string();
+        if (filenamesMatch(currentName, filename, ignoreCase)){
+
+            return to_string(getpid()) + ": " + filename + ": " + fs::absolute(entry.path()).string() + "\n";
+        }    
+            
+    }
+
+    return "";
 }
 
-void searchDirectory(const string& searchPath, const string& filename){
+string searchDirectory(const string& searchPath, const string& filename, bool ignoreCase){
 
+    string results;
     //Go through all entries in the search directory
     for(const auto& entry : fs::directory_iterator(searchPath)) {
-        checkEntry(entry, filename);
+        results += checkEntry(entry, filename, ignoreCase);
     }
+
+    return results;
 }
 
 
-void searchRecursive(const string& searchPath, const string& filename){
+string searchRecursive(const string& searchPath, const string& filename, bool ignoreCase){
 
+    string results;
     for(const auto& entry : fs::recursive_directory_iterator(searchPath)) {
-        checkEntry(entry, filename);
+        results += checkEntry(entry, filename, ignoreCase);
     }
+
+    return results;
 }
 
 
-void searchFile(const string& searchPath, const string& filename, bool recursive) {
+string searchFile(const string& searchPath, const string& filename, bool recursive, bool ignoreCase) {
     
     if(recursive){
-        searchRecursive(searchPath, filename);
+        return searchRecursive(searchPath, filename, ignoreCase);
     } else {
-        searchDirectory(searchPath, filename);
+        return searchDirectory(searchPath, filename, ignoreCase);
     }
 
 }
@@ -76,6 +102,11 @@ int main (int argc, char* argv[])
 
     vector<pid_t> childPids;
 
+    int pipefd[2];
+    //TODO: unnamed Pipe erstellen
+    //beim fehler EXIT_FAILURE zurückgeben
+
+
     for (int i = optind + 1; i<argc; i++) {
         
         pid_t pid = fork();
@@ -86,11 +117,18 @@ int main (int argc, char* argv[])
                 cout << "fork failed" << endl;
                 return EXIT_FAILURE;
 
-            case 0: // child
+            case 0: { // child
                 cout << "Child searches for: " << argv[i] << endl;
-                searchFile(argv[optind], argv[i], recursive);
+
+                //TODO: nicht benötigten Read-Descriptor schließen
+
+                string results = searchFile(argv[optind], argv[i], recursive, ignoreCase);
+                //TODO: nach der Suche die Ergebnisse über die Pipe seenden mit write() dann Write-Descriptor schließen
+                
+                
                 exit(EXIT_SUCCESS);
-            
+            }
+
             default: // parent returns child PID
                 cout << "Parent created child for: "<< argv[i] << endl;
                 childPids.push_back(pid);
@@ -98,6 +136,10 @@ int main (int argc, char* argv[])
         }
 
     }
+
+    //TODO: nicht benötigten Write-Descriptors schließen 
+    //TODO: Ergebnisse aus der Pipe lesen 
+    //TODO: Gelesne Ergebnisse auf stdout ausgeben und Read-Descriptor schließen
 
     // Parent waits for child to finish and prevents a zomnbie process
     for (pid_t childPid : childPids)
