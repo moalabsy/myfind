@@ -11,20 +11,8 @@ using namespace std;
 namespace fs = filesystem;
 
 
-
-string toLower(const string& text){
-    // TODO: Alle Zeichen in Kleinbuchstaben umwandeln du kannst tolower(c) verwenden
-    
-
-}
-
-bool filenamesMatch(const string& currentName, const string& filename, bool ignoreCase){
-    // TODO: Dateinamen vergleichen
-    //wenn ignoreCase false(!ignoreCase) ist, normal vergleichen.
-    //Wenn ignoreCase true ist, Groß-/Kleinschreibung ignoeieren. 
-    
-}
-
+string toLower(const string& text);
+bool filenamesMatch(const string& currentName, const string& filename, bool ignoreCase);
 
 string checkEntry(const fs::directory_entry& entry, const string& filename, bool ignoreCase){
 
@@ -74,6 +62,25 @@ string searchFile(const string& searchPath, const string& filename, bool recursi
 
 }
 
+string toLower(const string& text)
+{
+    string result = text;
+    for(char &c : result)
+    {
+        c = std::tolower(static_cast<unsigned char>(c));
+    }
+    return result;
+}
+
+bool filenamesMatch(const string& currentName, const string& filename, bool ignoreCase)
+{
+    if(!ignoreCase)
+    {
+        return currentName == filename;
+    }
+    return toLower(currentName) == toLower(filename);
+}
+
 
 
 
@@ -103,8 +110,12 @@ int main (int argc, char* argv[])
     vector<pid_t> childPids;
 
     int pipefd[2];
-    //TODO: unnamed Pipe erstellen
-    //beim fehler EXIT_FAILURE zurückgeben
+    // unnamed pipe erstellt und bei fehler EXIT_FAILURE zurückgeben
+    if(pipe(pipefd) == -1)
+    {
+        perror("pipe failed");
+        return EXIT_FAILURE;
+    }
 
 
     for (int i = optind + 1; i<argc; i++) {
@@ -121,11 +132,13 @@ int main (int argc, char* argv[])
                 cout << "Child searches for: " << argv[i] << endl;
 
                 //TODO: nicht benötigten Read-Descriptor schließen
+                close(pipefd[0]);
 
                 string results = searchFile(argv[optind], argv[i], recursive, ignoreCase);
                 //TODO: nach der Suche die Ergebnisse über die Pipe seenden mit write() dann Write-Descriptor schließen
-                
-                
+                write(pipefd[1], results.c_str(), results.size());
+
+                close(pipefd[1]);
                 exit(EXIT_SUCCESS);
             }
 
@@ -137,9 +150,19 @@ int main (int argc, char* argv[])
 
     }
 
-    //TODO: nicht benötigten Write-Descriptors schließen 
-    //TODO: Ergebnisse aus der Pipe lesen 
-    //TODO: Gelesne Ergebnisse auf stdout ausgeben und Read-Descriptor schließen
+    // nicht benötigten Write-Descriptors schließen
+     close(pipefd[1]);
+
+    // Aus der Pipe gelesene Ergebnisse auf stdout ausgeben 
+    char buffer[256];
+    ssize_t bytesRead;
+    while((bytesRead = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0)
+    {
+        buffer[bytesRead] = '\0';
+        cout << buffer;
+    }
+    // Read-Descriptor schließen
+    close(pipefd[0]);
 
     // Parent waits for child to finish and prevents a zomnbie process
     for (pid_t childPid : childPids)
