@@ -83,7 +83,6 @@ bool filenamesMatch(const string& currentName, const string& filename, bool igno
 
 
 
-
 int main (int argc, char* argv[])
 {
     bool recursive = false;
@@ -101,11 +100,6 @@ int main (int argc, char* argv[])
             ignoreCase = true;
         }
     }
-
-    cout << "recrusive = " << recursive << endl;
-    cout << "ignoreCase = " << ignoreCase << endl;
-    cout << "searchpath: " << argv[optind] << endl;
-
 
     vector<pid_t> childPids;
 
@@ -129,21 +123,21 @@ int main (int argc, char* argv[])
                 return EXIT_FAILURE;
 
             case 0: { // child
-                cout << "Child searches for: " << argv[i] << endl;
-
-                //TODO: nicht benötigten Read-Descriptor schließen
+                //nicht benötigten Read-Descriptor schließen
                 close(pipefd[0]);
 
                 string results = searchFile(argv[optind], argv[i], recursive, ignoreCase);
-                //TODO: nach der Suche die Ergebnisse über die Pipe seenden mit write() dann Write-Descriptor schließen
-                write(pipefd[1], results.c_str(), results.size());
+                //die Ergebnisse über die Pipe seenden mit write()
+                if (write(pipefd[1], results.c_str(), results.size()) == -1){
+                    perror("write failed");
+                    exit(EXIT_FAILURE);
+                }
 
                 close(pipefd[1]);
                 exit(EXIT_SUCCESS);
             }
 
             default: // parent returns child PID
-                cout << "Parent created child for: "<< argv[i] << endl;
                 childPids.push_back(pid);
                 break;
         }
