@@ -100,11 +100,15 @@ int main (int argc, char* argv[])
             ignoreCase = true;
         }
     }
+    // The searchpath and at least one filename are required
+    if (argc - optind < 2){
+        cerr << "Usage: " << argv[0] << "[-R] [-i] searchpath filename1 filename2 ...\n";
+    }
 
     vector<pid_t> childPids;
 
     int pipefd[2];
-    // unnamed pipe erstellt und bei fehler EXIT_FAILURE zurückgeben
+    // create the unnamed pipe and return EXIT_FAILURE on error
     if(pipe(pipefd) == -1)
     {
         perror("pipe failed");
@@ -123,11 +127,11 @@ int main (int argc, char* argv[])
                 return EXIT_FAILURE;
 
             case 0: { // child
-                //nicht benötigten Read-Descriptor schließen
+                // close the unused read descriptor
                 close(pipefd[0]);
 
                 string results = searchFile(argv[optind], argv[i], recursive, ignoreCase);
-                //die Ergebnisse über die Pipe seenden mit write()
+                // send the results through the pipe using write()
                 if (write(pipefd[1], results.c_str(), results.size()) == -1){
                     perror("write failed");
                     exit(EXIT_FAILURE);
@@ -144,10 +148,10 @@ int main (int argc, char* argv[])
 
     }
 
-    // nicht benötigten Write-Descriptors schließen
+    // close the unused write descriptor
      close(pipefd[1]);
 
-    // Aus der Pipe gelesene Ergebnisse auf stdout ausgeben 
+    // print the results read from the pipe to stdout
     char buffer[256];
     ssize_t bytesRead;
     while((bytesRead = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0)
@@ -155,7 +159,7 @@ int main (int argc, char* argv[])
         buffer[bytesRead] = '\0';
         cout << buffer;
     }
-    // Read-Descriptor schließen
+    // close the read descriptor
     close(pipefd[0]);
 
     // Parent waits for child to finish and prevents a zomnbie process
